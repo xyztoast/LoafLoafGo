@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <link rel="icon" href="favicon.png">
     <title>LoafLoafGo</title>
-    <!-- Importing Fira Code -->
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         /* CSS Reset */
@@ -269,6 +268,71 @@
 
         input::placeholder { color: rgba(255, 255, 255, 0.6); }
 
+        .search-suggestions {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 8px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            z-index: 100;
+        }
+        .suggestion-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 16px;
+            border-radius: 14px;
+            cursor: pointer;
+            gap: 12px;
+            transition: var(--transition-smooth);
+            border: 1px solid transparent;
+        }
+        .suggestion-item:hover {
+            background: var(--accent-color);
+        }
+        .suggestion-number {
+            font-weight: 700;
+            color: var(--accent-color);
+            min-width: 16px;
+            font-size: 0.9rem;
+        }
+        .suggestion-item:hover .suggestion-number {
+            color: white;
+        }
+        .suggestion-info {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+        .suggestion-name {
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 0.9rem;
+            color: white;
+        }
+        .suggestion-url {
+            font-size: 0.75rem;
+            opacity: 0.6;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #eee;
+        }
+        .suggestion-item.selection-active {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        .suggestion-item.selection-active:hover {
+            background: var(--accent-color);
+        }
+
         .bookmarks-row {
             display: flex;
             flex-wrap: wrap;
@@ -419,6 +483,8 @@
                 </span>
                 <input type="text" placeholder="Search or type URL..." id="search-input" autocomplete="off">
             </div>
+            
+            <div id="search-suggestions" class="search-suggestions"></div>
 
             <div class="bookmarks-row" id="bookmarks-row">
                 <button class="add-bookmark-btn" id="add-bookmark-trigger">+</button>
@@ -426,7 +492,6 @@
         </div>
     </div>
 
-    <!-- Modals -->
     <div id="modal">
         <div class="modal-box">
             <h3 id="modal-title">New Bookmark</h3>
@@ -469,6 +534,10 @@
             <button class="btn btn-action" id="export-btn">Export JSON</button>
             <button class="btn btn-action" id="import-btn">Import JSON</button>
             <input type="file" id="import-file-input" style="display: none;" accept=".json">
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px; margin-bottom: 4px;">
+                <input type="checkbox" id="loaf_require_tab_for_shortcuts_toggle" style="width: 16px; height: 16px; padding: 0; margin: 0; background: transparent; border: none; -webkit-appearance: checkbox; appearance: checkbox; cursor: pointer;">
+                <label for="loaf_require_tab_for_shortcuts_toggle" style="font-size: 0.8rem; opacity: 0.9; cursor: pointer; user-select: none;">Require Tab before number shortcuts</label>
+            </div>
             <div class="modal-actions">
                 <button class="btn btn-cancel" id="close-settings" style="width: 100%;">Close</button>
             </div>
@@ -709,6 +778,153 @@
                 bmModal.style.display = 'flex';
             }
         };
+
+        // Bookmark Suggestions & Shortcut Settings Features
+        let requireTabForShortcuts = localStorage.getItem('loaf_require_tab_for_shortcuts') === 'true';
+        let currentSuggestions = [];
+        let selectionModeActive = false;
+
+        const suggestionsContainer = document.getElementById('search-suggestions');
+        const shortcutToggle = document.getElementById('loaf_require_tab_for_shortcuts_toggle');
+
+        if (shortcutToggle) {
+            shortcutToggle.checked = requireTabForShortcuts;
+            shortcutToggle.addEventListener('change', (e) => {
+                requireTabForShortcuts = e.target.checked;
+                localStorage.setItem('loaf_require_tab_for_shortcuts', requireTabForShortcuts);
+            });
+        }
+
+        function getAllBookmarks() {
+            let list = [];
+            if (data && data.bookmarks) {
+                data.bookmarks.forEach(bm => {
+                    list.push({ name: bm.name || '', url: bm.url || '' });
+                });
+            }
+            if (data && data.folders) {
+                data.folders.forEach(folder => {
+                    if (folder.links) {
+                        folder.links.forEach(link => {
+                            list.push({ name: link.name || '', url: link.url || '' });
+                        });
+                    }
+                });
+            }
+            return list;
+        }
+
+        function openBookmarkUrl(url) {
+            window.location.href = url.startsWith('http') ? url : 'https://' + url;
+        }
+
+        function updateSuggestions() {
+            const query = searchInput.value.trim().toLowerCase();
+            if (!query) {
+                suggestionsContainer.style.display = 'none';
+                currentSuggestions = [];
+                selectionModeActive = false;
+                return;
+            }
+
+            const allBMs = getAllBookmarks();
+            const filtered = allBMs.filter(bm => 
+                bm.name.toLowerCase().includes(query) || 
+                bm.url.toLowerCase().includes(query)
+            );
+
+            currentSuggestions = filtered.slice(0, 9);
+
+            if (currentSuggestions.length === 0) {
+                suggestionsContainer.style.display = 'none';
+                selectionModeActive = false;
+                return;
+            }
+
+            suggestionsContainer.innerHTML = '';
+            currentSuggestions.forEach((bm, index) => {
+                const item = document.createElement('div');
+                item.className = 'suggestion-item';
+                if (selectionModeActive) {
+                    item.classList.add('selection-active');
+                }
+
+                const numSpan = document.createElement('span');
+                numSpan.className = 'suggestion-number';
+                numSpan.innerText = index + 1;
+
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'suggestion-info';
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'suggestion-name';
+                nameSpan.innerText = bm.name;
+
+                const urlSpan = document.createElement('span');
+                urlSpan.className = 'suggestion-url';
+                urlSpan.innerText = bm.url;
+
+                infoDiv.appendChild(nameSpan);
+                infoDiv.appendChild(urlSpan);
+                item.appendChild(numSpan);
+                item.appendChild(infoDiv);
+
+                item.addEventListener('click', () => {
+                    openBookmarkUrl(bm.url);
+                });
+
+                suggestionsContainer.appendChild(item);
+            });
+
+            suggestionsContainer.style.display = 'flex';
+        }
+
+        searchInput.addEventListener('input', () => {
+            selectionModeActive = false;
+            updateSuggestions();
+        });
+
+        searchInput.addEventListener('keydown', (e) => {
+            const suggestionsVisible = suggestionsContainer.style.display === 'flex' && currentSuggestions.length > 0;
+
+            if (suggestionsVisible) {
+                if (e.key === 'Escape') {
+                    if (requireTabForShortcuts && selectionModeActive) {
+                        selectionModeActive = false;
+                        const items = suggestionsContainer.querySelectorAll('.suggestion-item');
+                        items.forEach(item => item.classList.remove('selection-active'));
+                        e.preventDefault();
+                    } else {
+                        suggestionsContainer.style.display = 'none';
+                        currentSuggestions = [];
+                        selectionModeActive = false;
+                        e.preventDefault();
+                    }
+                    return;
+                }
+
+                if (e.key === 'Tab' && requireTabForShortcuts) {
+                    if (!selectionModeActive) {
+                        selectionModeActive = true;
+                        const items = suggestionsContainer.querySelectorAll('.suggestion-item');
+                        items.forEach(item => item.classList.add('selection-active'));
+                        e.preventDefault();
+                        return;
+                    }
+                }
+
+                if (/^[1-9]$/.test(e.key)) {
+                    const index = parseInt(e.key, 10) - 1;
+                    if (index < currentSuggestions.length) {
+                        if (!requireTabForShortcuts || selectionModeActive) {
+                            e.preventDefault();
+                            openBookmarkUrl(currentSuggestions[index].url);
+                            return;
+                        }
+                    }
+                }
+            }
+        });
 
         renderAll();
         document.addEventListener('keydown', (e) => {
