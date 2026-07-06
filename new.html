@@ -1,936 +1,259 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <link rel="icon" href="favicon.png">
-    <title>LoafLoafGo</title>
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        /* CSS Reset */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Fira Code', monospace;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Search Component</title>
+  <style>
+    /* --- Theme Variables (Adjust these to match your existing page) --- */
+    :root {
+      --bg-color: #1e1e2e;
+      --search-bg: #252538;
+      --text-color: #cdd6f4;
+      --border-color: #45475a;
+      --accent-color: #89b4fa; /* Google blue / Accent */
+      --ddg-color: #de5833;    /* DuckDuckGo Orange */
+      --radius: 24px;
+    }
 
-        :root {
-            --accent-color: #698f50; 
-            --glass-bg: rgba(255, 255, 255, 0.12);
-            --glass-border: rgba(255, 255, 255, 0.2);
-            --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            --sidebar-width: 50px; 
-        }
+    body {
+      background-color: var(--bg-color);
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      justify-content: center;
+      padding-top: 100px;
+      color: var(--text-color);
+    }
 
-        body, html {
-            height: 100%;
-            width: 100%;
-            overflow: hidden; /* This handles both X and Y */
-            overflow-x: hidden; /* Explicitly prevent horizontal scroll */
-            background-color: #1a1a1a;
-            /* Setup body as the primary background container */
-            background-size: 110% 110%; /* Slightly larger for parallax wiggle room */
-            background-position: center;
-            background-repeat: no-repeat;
-            transition: background-image 0.5s ease-in-out;
-            position: relative;
-        }
+    /* --- Search Container --- */
+    .search-container {
+      position: relative;
+      width: 100%;
+      max-width: 600px;
+      margin: 0 20px;
+    }
 
-        /* Subtle dark overlay for readability */
-        body::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.3);
-            z-index: 0;
-            pointer-events: none;
-        }
+    /* Search Input Wrapper */
+    .search-wrapper {
+      display: flex;
+      align-items: center;
+      background-color: var(--search-bg);
+      border: 2px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 6px 16px;
+      transition: border-color 0.2s, border-radius 0.2s;
+    }
 
-        g {
-            color: var(--accent-color);
-        }
+    /* Flatten bottom corners when suggestions are active to look connected */
+    .search-container.has-suggestions .search-wrapper {
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+      border-bottom-color: transparent;
+    }
 
-        /* Sidebar Styles */
-        #sidebar {
-            position: fixed;
-            left: 0;
-            top: 0;
-            height: 100vh;
-            width: var(--sidebar-width);
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
-            border-right: 1px solid var(--glass-border);
-            z-index: 500;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 15px 0;
-            gap: 12px;
-        }
+    .search-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-color);
+      font-size: 16px;
+      padding: 8px 0;
+      padding-right: 12px;
+    }
 
-        .folder-item {
-            position: relative;
-            width: 36px;
-            height: 36px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 1.2rem;
-            transition: var(--transition-smooth);
-        }
+    /* --- Custom Engine Toggle Switch --- */
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      user-select: none;
+    }
 
-        .folder-item:hover {
-            background: var(--accent-color);
-            border-color: var(--accent-color);
-        }
+    .engine-label {
+      font-size: 12px;
+      font-weight: 600;
+      min-width: 24px;
+      text-align: center;
+      transition: color 0.2s;
+    }
 
-        .folder-flyout {
-            position: absolute;
-            left: 37px;
-            top: 0;
-            background: rgba(30, 30, 30, 0.95);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            padding: 12px;
-            min-width: 220px;
-            display: none;
-            flex-direction: column;
-            gap: 8px;
-            box-shadow: 10px 10px 30px rgba(0,0,0,0.5);
-            z-index: 1000;
-        }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
 
-        .folder-item:hover .folder-flyout {
-            display: flex;
-        }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
 
-        .flyout-header {
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: var(--accent-color);
-            padding-bottom: 5px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            margin-bottom: 5px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: var(--accent-color);
+      transition: 0.3s;
+      border-radius: 24px;
+    }
 
-        .add-link-to-folder {
-            font-size: 1rem;
-            cursor: pointer;
-            opacity: 0.7;
-        }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
 
-        .add-link-to-folder:hover { opacity: 1; color: var(--accent-color); }
+    /* DuckDuckGo Checked State */
+    input:checked + .slider {
+      background-color: var(--ddg-color);
+    }
 
-        .folder-link {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 12px;
-            border-radius: 8px;
-            text-decoration: none;
-            color: #eee;
-            font-size: 0.85rem;
-            transition: background 0.2s;
-        }
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
 
-        .folder-link:hover {
-            background: var(--accent-color);
-        }
+    /* --- Floating Suggestions Box --- */
+    .suggestions-box {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background-color: var(--search-bg);
+      border: 2px solid var(--border-color);
+      border-top: none;
+      border-bottom-left-radius: var(--radius);
+      border-bottom-right-radius: var(--radius);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+      z-index: 999;
+      display: none; /* Hidden by default */
+      overflow: hidden;
+    }
 
-        .sidebar-add-btn {
-            background: var(--accent-color);
-            color: white;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 1.2rem;
-            border: none;
-            transition: var(--transition-smooth);
-        }
+    /* Display suggestions when parent container has class */
+    .search-container.has-suggestions .suggestions-box {
+      display: block;
+    }
 
-        .sidebar-add-btn:hover {
-            transform: rotate(90deg);
-            filter: brightness(1.2);
-        }
+    .suggestion-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
 
-        .sidebar-bottom-actions {
-            margin-top: auto;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-            padding-bottom: 10px;
-        }
-
-        .sidebar-icon-btn {
-            background: transparent;
-            border: none;
-            color: white;
-            cursor: pointer;
-            opacity: 0.5;
-            transition: var(--transition-smooth);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 8px;
-        }
-
-        .sidebar-icon-btn:hover {
-            opacity: 1;
-            color: var(--accent-color);
-        }
-
-        /* Main Workspace */
-        .container {
-            height: 100vh;
-            width: calc(100% - var(--sidebar-width));
-            margin-left: var(--sidebar-width);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: #ffffff;
-            padding: 20px;
-            position: relative;
-            z-index: 10;
-            overflow-x: hidden;
-        }
-
-        .brand-section {
-            text-align: center;
-            margin-bottom: 40px;
-            animation: fadeIn 1.2s ease-out;
-            cursor: default;
-        }
-
-        .brand-title {
-            font-size: 5rem;
-            font-weight: 600;
-            letter-spacing: -2px;
-            text-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            transition: var(--transition-smooth);
-            background-color: rgba(0, 0, 0, 0.25);
-            padding: 10px 20px;
-            border-radius: 16px;
-            backdrop-filter: blur(5px);
-        }
-
-        .interaction-area {
-            width: 100%;
-            max-width: 800px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            animation: slideUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
-        }
-
-        .search-bar {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid var(--glass-border);
-            border-radius: 32px;
-            padding: 8px 24px;
-            display: flex;
-            align-items: center;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-            backdrop-filter: blur(10px);
-            transition: var(--transition-smooth);
-        }
-
-        .search-bar:focus-within {
-            background: rgba(255, 255, 255, 0.2);
-            border-color: var(--accent-color);
-            transform: translateY(-2px);
-        }
-
-        input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            outline: none;
-            color: white;
-            font-size: 1rem;
-            padding: 12px 0;
-        }
-
-        input::placeholder { color: rgba(255, 255, 255, 0.6); }
-
-        .search-suggestions {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            padding: 8px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            display: none;
-            flex-direction: column;
-            gap: 4px;
-            z-index: 100;
-        }
-        .suggestion-item {
-            display: flex;
-            align-items: center;
-            padding: 10px 16px;
-            border-radius: 14px;
-            cursor: pointer;
-            gap: 12px;
-            transition: var(--transition-smooth);
-            border: 1px solid transparent;
-        }
-        .suggestion-item:hover {
-            background: var(--accent-color);
-        }
-        .suggestion-number {
-            font-weight: 700;
-            color: var(--accent-color);
-            min-width: 16px;
-            font-size: 0.9rem;
-        }
-        .suggestion-item:hover .suggestion-number {
-            color: white;
-        }
-        .suggestion-info {
-            display: flex;
-            flex-direction: column;
-            flex: 1;
-            overflow: hidden;
-        }
-        .suggestion-name {
-            font-weight: 500;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            font-size: 0.9rem;
-            color: white;
-        }
-        .suggestion-url {
-            font-size: 0.75rem;
-            opacity: 0.6;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            color: #eee;
-        }
-        .suggestion-item.selection-active {
-            background: rgba(255, 255, 255, 0.05);
-            border-color: rgba(255, 255, 255, 0.2);
-        }
-        .suggestion-item.selection-active:hover {
-            background: var(--accent-color);
-        }
-
-        .bookmarks-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            padding: 0 12px;
-            align-items: center;
-        }
-
-        .bookmark-link {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 6px 12px;
-            border-radius: 18px;
-            text-decoration: none;
-            color: white;
-            font-size: 0.8rem;
-            font-weight: 300;
-            backdrop-filter: blur(5px);
-            transition: background 0.3s ease, border-color 0.3s ease;
-        }
-
-        .bookmark-link:hover {
-            background: var(--accent-color);
-            border-color: var(--accent-color);
-        }
-
-        .fav-icon { width: 14px; height: 14px; object-fit: contain; }
-
-        .add-bookmark-btn {
-            background: rgba(255, 255, 255, 0.15);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: white;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: var(--transition-smooth);
-        }
-
-        .add-bookmark-btn:hover { background: var(--accent-color); }
-
-        /* Modals */
-        #modal, #folder-modal, #bg-modal, #settings-modal {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
-            backdrop-filter: blur(10px);
-            z-index: 2000;
-            display: none;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-box {
-            background: rgba(30, 30, 30, 0.95);
-            border: 1px solid rgba(255,255,255,0.1);
-            padding: 24px;
-            border-radius: 20px;
-            width: 340px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            color: white;
-        }
-
-        .modal-box h3 { color: #ffffff; font-weight: 400; }
-
-        .modal-box input {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            padding: 10px;
-            border-radius: 8px;
-            color: white;
-        }
-
-        .modal-actions { display: flex; gap: 8px; margin-top: 10px; }
-
-        .btn { flex: 1; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 500; border: none; transition: var(--transition-smooth); display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .btn-save { background: var(--accent-color); color: white; }
-        .btn-cancel { background: transparent; color: white; border: 1px solid rgba(255,255,255,0.2); }
-        .btn-action { background: rgba(255, 255, 255, 0.1); color: white; border: 1px solid rgba(255,255,255,0.1); }
-        .btn-action:hover { background: rgba(255, 255, 255, 0.2); }
-
-        /* Custom Context Menu */
-        #custom-menu {
-            position: fixed;
-            z-index: 3000;
-            width: 160px;
-            background: rgba(35, 35, 35, 0.95);
-            backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            display: none;
-            flex-direction: column;
-            padding: 5px;
-        }
-
-        .menu-item { padding: 10px 15px; color: #eee; font-size: 0.85rem; cursor: pointer; border-radius: 8px; }
-
-        .menu-item:hover { background: var(--accent-color); color: white; }
-        .menu-item.delete:hover { background: #b54d4d; }
-
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-
-        @media (max-width: 600px) {
-            .brand-title { font-size: 3rem; }
-        }
-    </style>
+    .suggestion-item:hover {
+      background-color: var(--border-color);
+    }
+  </style>
 </head>
 <body>
 
-    <div id="sidebar">
-        <button class="sidebar-add-btn" id="add-folder-trigger">+</button>
-        <div id="folders-container" style="display:contents;"></div>
-        
-        <div class="sidebar-bottom-actions">
-            <button class="sidebar-icon-btn" id="settings-trigger" title="Settings">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                </svg>
-            </button>
-            <button class="sidebar-icon-btn" id="bg-edit-trigger" title="Edit Background">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                </svg>
-            </button>
-        </div>
+  <div class="search-container" id="searchContainer">
+    <div class="search-wrapper">
+      <input type="text" id="searchInput" class="search-input" placeholder="Search or type a URL..." autocomplete="off">
+      
+      <div class="toggle-container">
+        <span class="engine-label" id="engineLabel" style="color: var(--accent-color);">G</span>
+        <label class="switch">
+          <input type="checkbox" id="engineToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
     </div>
 
-    <div class="container">
-        <div class="brand-section">
-            <h1 class="brand-title"><g>LoafLoaf</g>Go</h1>
-        </div>
-
-        <div class="interaction-area">
-            <div class="search-bar">
-                <span style="margin-right:15px; opacity:0.8; display:flex;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                </span>
-                <input type="text" placeholder="Search or type URL..." id="search-input" autocomplete="off">
-            </div>
-            
-            <div id="search-suggestions" class="search-suggestions"></div>
-
-            <div class="bookmarks-row" id="bookmarks-row">
-                <button class="add-bookmark-btn" id="add-bookmark-trigger">+</button>
-            </div>
-        </div>
+    <div class="suggestions-box" id="suggestionsBox">
+      <div class="suggestion-item">Example Search Suggestion 1</div>
+      <div class="suggestion-item">Example Search Suggestion 2</div>
+      <div class="suggestion-item">Example Search Suggestion 3</div>
     </div>
+  </div>
 
-    <div id="modal">
-        <div class="modal-box">
-            <h3 id="modal-title">New Bookmark</h3>
-            <input type="text" id="bm-name" placeholder="Title">
-            <input type="text" id="bm-url" placeholder="URL">
-            <div class="modal-actions">
-                <button class="btn btn-cancel" id="cancel-bm">Cancel</button>
-                <button class="btn btn-save" id="save-bm">Save</button>
-            </div>
-        </div>
-    </div>
+  <script>
+    const searchInput = document.getElementById('searchInput');
+    const searchContainer = document.getElementById('searchContainer');
+    const engineToggle = document.getElementById('engineToggle');
+    const engineLabel = document.getElementById('engineLabel');
+    const suggestionsBox = document.getElementById('suggestionsBox');
 
-    <div id="folder-modal">
-        <div class="modal-box">
-            <h3 id="folder-modal-title">New Folder</h3>
-            <input type="text" id="f-emoji" placeholder="Emoji">
-            <input type="text" id="f-name" placeholder="Name">
-            <div class="modal-actions">
-                <button class="btn btn-cancel" id="cancel-f">Cancel</button>
-                <button class="btn btn-save" id="save-f">Save</button>
-            </div>
-        </div>
-    </div>
+    // Update label text/color on toggle change
+    engineToggle.addEventListener('change', () => {
+      if (engineToggle.checked) {
+        engineLabel.textContent = 'DDG';
+        engineLabel.style.color = 'var(--ddg-color)';
+      } else {
+        engineLabel.textContent = 'G';
+        engineLabel.style.color = 'var(--accent-color)';
+      }
+    });
 
-    <div id="bg-modal">
-        <div class="modal-box">
-            <h3>Background Image</h3>
-            <input type="text" id="bg-url-input" placeholder="Image URL">
-            <div class="modal-actions">
-                <button class="btn btn-cancel" id="cancel-bg">Cancel</button>
-                <button class="btn btn-save" id="save-bg">Apply</button>
-            </div>
-        </div>
-    </div>
+    // Dummy helper to show/hide suggestions box and trigger connected layout
+    searchInput.addEventListener('input', () => {
+      if (searchInput.value.trim().length > 0) {
+        searchContainer.classList.add('has-suggestions');
+      } else {
+        searchContainer.classList.remove('has-suggestions');
+      }
+    });
 
-    <div id="settings-modal">
-        <div class="modal-box">
-            <h3>Data Management</h3>
-            <p style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 8px;">Backup or restore your bookmarks.</p>
-            <button class="btn btn-action" id="export-btn">Export JSON</button>
-            <button class="btn btn-action" id="import-btn">Import JSON</button>
-            <input type="file" id="import-file-input" style="display: none;" accept=".json">
-            <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px; margin-bottom: 4px;">
-                <input type="checkbox" id="loaf_require_tab_for_shortcuts_toggle" style="width: 16px; height: 16px; padding: 0; margin: 0; background: transparent; border: none; -webkit-appearance: checkbox; appearance: checkbox; cursor: pointer;">
-                <label for="loaf_require_tab_for_shortcuts_toggle" style="font-size: 0.8rem; opacity: 0.9; cursor: pointer; user-select: none;">Require Tab before number shortcuts</label>
-            </div>
-            <div class="modal-actions">
-                <button class="btn btn-cancel" id="close-settings" style="width: 100%;">Close</button>
-            </div>
-        </div>
-    </div>
+    // Close suggestions if clicking outside
+    document.addEventListener('click', (e) => {
+      if (!searchContainer.contains(e.target)) {
+        searchContainer.classList.remove('has-suggestions');
+      }
+    });
 
-    <div id="custom-menu">
-        <div class="menu-item" id="menu-edit">Edit</div>
-        <div class="menu-item delete" id="menu-delete">Delete</div>
-    </div>
+    // Helper function to check if input is a valid URL
+    function isURL(str) {
+      // Basic check for protocol or popular domain endings without spaces
+      const urlPattern = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([\/\w .-]*)*\/?$/i;
+      return urlPattern.test(str.trim()) && !str.includes(' ');
+    }
 
-    <script>
-        let data = JSON.parse(localStorage.getItem('loaf_data')) || { bookmarks: [], folders: [] };
+    // Handle Submission
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const query = searchInput.value.trim();
+        if (!query) return;
 
-        function updateBackground() {
-            const savedBg = localStorage.getItem('loaf_bg_url');
-            const defaultBg = 'https://images.unsplash.com/photo-1485470733090-0aae1788d5af?fm=jpg&q=60&w=3000&auto=format&fit=crop';
-            const url = (savedBg && savedBg.trim() !== '') ? savedBg : defaultBg;
-            
-            // Apply background directly to body
-            document.body.style.backgroundImage = `url('${url}')`;
+        if (isURL(query)) {
+          // It's a direct URL address, point straight to it
+          let url = query;
+          if (!/^https?:\/\//i.test(url)) {
+            url = 'https://' + url;
+          }
+          window.location.href = url;
+        } else {
+          // It's a text query, use the selected search engine
+          let searchUrl = '';
+          if (engineToggle.checked) {
+            // DuckDuckGo
+            searchUrl = `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
+          } else {
+            // Google
+            searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+          }
+          window.location.href = searchUrl;
         }
-        
-        updateBackground();
+      }
+    });
 
-        // Parallax Effect (Moves background position on body)
-        document.addEventListener('mousemove', (e) => {
-            const moveX = (e.clientX - window.innerWidth / 2) * 0.01;
-            const moveY = (e.clientY - window.innerHeight / 2) * 0.01;
-            // Center is 50%, we add offset to move the image slightly
-            document.body.style.backgroundPosition = `calc(50% + ${moveX}px) calc(50% + ${moveY}px)`;
-        });
+    // Make suggestion items clickable
+    document.querySelectorAll('.suggestion-item').forEach(item => {
+      item.addEventListener('click', () => {
+        searchInput.value = item.textContent;
+        // Trigger enter key behavior
+        searchInput.dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));
+      });
+    });
+  </script>
 
-        // Search Logic
-        const searchInput = document.getElementById('search-input');
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                const query = searchInput.value.trim();
-                if (!query) return;
-                const isUrl = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([\/\w .-]*)*\/?$/i.test(query) && !query.includes(' ');
-                if (isUrl) window.location.href = query.startsWith('http') ? query : 'https://' + query;
-                else window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-            }
-        });
-
-        function saveData() {
-            localStorage.setItem('loaf_data', JSON.stringify(data));
-            renderAll();
-        }
-
-        const bookmarksRow = document.getElementById('bookmarks-row');
-        const foldersContainer = document.getElementById('folders-container');
-        const customMenu = document.getElementById('custom-menu');
-        let activeContext = { type: '', index: -1, folderIndex: -1 };
-
-        function renderAll() {
-            renderGlobalBookmarks();
-            renderFolders();
-        }
-
-        function renderGlobalBookmarks() {
-            document.querySelectorAll('.bookmark-link').forEach(el => el.remove());
-            data.bookmarks.forEach((bm, i) => {
-                const link = createBookmarkElement(bm, i);
-                link.oncontextmenu = (e) => triggerContextMenu(e, 'global', i);
-                bookmarksRow.insertBefore(link, document.getElementById('add-bookmark-trigger'));
-            });
-        }
-
-        function renderFolders() {
-            foldersContainer.innerHTML = '';
-            data.folders.forEach((folder, fIdx) => {
-                const div = document.createElement('div');
-                div.className = 'folder-item';
-                div.innerText = folder.emoji || '📁';
-                div.oncontextmenu = (e) => triggerContextMenu(e, 'folder', fIdx);
-
-                const flyout = document.createElement('div');
-                flyout.className = 'folder-flyout';
-                flyout.innerHTML = `<div class="flyout-header"><span>${folder.name}</span><span class="add-link-to-folder" onclick="openBmModal(${fIdx})">+</span></div>`;
-                
-                folder.links.forEach((linkData, lIdx) => {
-                    const l = document.createElement('a');
-                    l.className = 'folder-link';
-                    l.href = linkData.url.startsWith('http') ? linkData.url : 'https://' + linkData.url;
-                    const domain = linkData.url.replace(/^(?:https?:\/\/)?(?:www\.)?/i, "").split('/')[0];
-                    l.innerHTML = `<img class="fav-icon" src="https://www.google.com/s2/favicons?sz=64&domain=${domain}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22white%22><path d=%22M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z%22/></svg>'"> ${linkData.name}`;
-                    l.oncontextmenu = (e) => triggerContextMenu(e, 'folder-link', lIdx, fIdx);
-                    flyout.appendChild(l);
-                });
-                div.appendChild(flyout);
-                foldersContainer.appendChild(div);
-            });
-        }
-
-        function createBookmarkElement(bm, i) {
-            const domain = bm.url.replace(/^(?:https?:\/\/)?(?:www\.)?/i, "").split('/')[0];
-            const a = document.createElement('a');
-            a.className = 'bookmark-link';
-            a.href = bm.url.startsWith('http') ? bm.url : 'https://' + bm.url;
-            a.innerHTML = `<img class="fav-icon" src="https://www.google.com/s2/favicons?sz=64&domain=${domain}" onerror="this.innerText='🌐'"> ${bm.name}`;
-            return a;
-        }
-
-        // Modals
-        const bmModal = document.getElementById('modal');
-        const folderModal = document.getElementById('folder-modal');
-        const bgModal = document.getElementById('bg-modal');
-        const settingsModal = document.getElementById('settings-modal');
-        let currentTargetFolder = -1;
-        let editingIndex = -1;
-
-        window.openBmModal = (fIdx = -1) => {
-            currentTargetFolder = fIdx;
-            editingIndex = -1;
-            document.getElementById('modal-title').innerText = fIdx === -1 ? "New Bookmark" : "Add to " + data.folders[fIdx].name;
-            document.getElementById('bm-name').value = '';
-            document.getElementById('bm-url').value = '';
-            bmModal.style.display = 'flex';
-        };
-
-        document.getElementById('add-bookmark-trigger').onclick = () => openBmModal();
-        document.getElementById('cancel-bm').onclick = () => bmModal.style.display = 'none';
-        document.getElementById('save-bm').onclick = () => {
-            const name = document.getElementById('bm-name').value.trim();
-            const url = document.getElementById('bm-url').value.trim();
-            if (!name || !url) return;
-            if (currentTargetFolder === -1) {
-                if (editingIndex === -1) data.bookmarks.push({ name, url });
-                else data.bookmarks[editingIndex] = { name, url };
-            } else {
-                if (editingIndex === -1) data.folders[currentTargetFolder].links.push({ name, url });
-                else data.folders[currentTargetFolder].links[editingIndex] = { name, url };
-            }
-            bmModal.style.display = 'none';
-            saveData();
-        };
-
-        document.getElementById('add-folder-trigger').onclick = () => {
-            editingIndex = -1;
-            document.getElementById('folder-modal-title').innerText = "New Folder";
-            document.getElementById('f-emoji').value = '📁';
-            document.getElementById('f-name').value = '';
-            folderModal.style.display = 'flex';
-        };
-
-        document.getElementById('cancel-f').onclick = () => folderModal.style.display = 'none';
-        document.getElementById('save-f').onclick = () => {
-            const name = document.getElementById('f-name').value.trim();
-            const emoji = document.getElementById('f-emoji').value.trim();
-            if (!name) return;
-            if (editingIndex === -1) data.folders.push({ name, emoji, links: [] });
-            else data.folders[editingIndex] = { ...data.folders[editingIndex], name, emoji };
-            folderModal.style.display = 'none';
-            saveData();
-        };
-
-        document.getElementById('bg-edit-trigger').onclick = () => {
-            document.getElementById('bg-url-input').value = localStorage.getItem('loaf_bg_url') || '';
-            bgModal.style.display = 'flex';
-        };
-        document.getElementById('cancel-bg').onclick = () => bgModal.style.display = 'none';
-        document.getElementById('save-bg').onclick = () => {
-            const newUrl = document.getElementById('bg-url-input').value.trim();
-            localStorage.setItem('loaf_bg_url', newUrl);
-            updateBackground(); // Update body background immediately
-            bgModal.style.display = 'none';
-        };
-
-        // Settings
-        document.getElementById('settings-trigger').onclick = () => settingsModal.style.display = 'flex';
-        document.getElementById('close-settings').onclick = () => settingsModal.style.display = 'none';
-
-        document.getElementById('export-btn').onclick = () => {
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'loafloafgo_backup.json';
-            a.click();
-        };
-
-        document.getElementById('import-btn').onclick = () => document.getElementById('import-file-input').click();
-        document.getElementById('import-file-input').onchange = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                try {
-                    const imported = JSON.parse(event.target.result);
-                    if (imported.bookmarks || imported.folders) {
-                        data = imported;
-                        saveData();
-                        settingsModal.style.display = 'none';
-                    }
-                } catch (err) { alert("Invalid file format"); }
-            };
-            reader.readAsText(file);
-        };
-
-        // Context Menu
-        function triggerContextMenu(e, type, index, folderIndex = -1) {
-            e.preventDefault();
-            activeContext = { type, index, folderIndex };
-            customMenu.style.display = 'flex';
-            customMenu.style.left = `${e.clientX}px`;
-            customMenu.style.top = `${e.clientY}px`;
-        }
-
-        document.addEventListener('click', () => customMenu.style.display = 'none');
-        document.getElementById('menu-delete').onclick = () => {
-            const { type, index, folderIndex } = activeContext;
-            if (type === 'global') data.bookmarks.splice(index, 1);
-            else if (type === 'folder') data.folders.splice(index, 1);
-            else if (type === 'folder-link') data.folders[folderIndex].links.splice(index, 1);
-            saveData();
-        };
-
-        document.getElementById('menu-edit').onclick = () => {
-            const { type, index, folderIndex } = activeContext;
-            editingIndex = index;
-            if (type === 'global') {
-                const bm = data.bookmarks[index];
-                document.getElementById('bm-name').value = bm.name;
-                document.getElementById('bm-url').value = bm.url;
-                currentTargetFolder = -1;
-                bmModal.style.display = 'flex';
-            } else if (type === 'folder') {
-                const f = data.folders[index];
-                document.getElementById('f-name').value = f.name;
-                document.getElementById('f-emoji').value = f.emoji;
-                folderModal.style.display = 'flex';
-            } else if (type === 'folder-link') {
-                const bm = data.folders[folderIndex].links[index];
-                document.getElementById('bm-name').value = bm.name;
-                document.getElementById('bm-url').value = bm.url;
-                currentTargetFolder = folderIndex;
-                bmModal.style.display = 'flex';
-            }
-        };
-
-        // Bookmark Suggestions & Shortcut Settings Features
-        let requireTabForShortcuts = localStorage.getItem('loaf_require_tab_for_shortcuts') === 'true';
-        let currentSuggestions = [];
-        let selectionModeActive = false;
-
-        const suggestionsContainer = document.getElementById('search-suggestions');
-        const shortcutToggle = document.getElementById('loaf_require_tab_for_shortcuts_toggle');
-
-        if (shortcutToggle) {
-            shortcutToggle.checked = requireTabForShortcuts;
-            shortcutToggle.addEventListener('change', (e) => {
-                requireTabForShortcuts = e.target.checked;
-                localStorage.setItem('loaf_require_tab_for_shortcuts', requireTabForShortcuts);
-            });
-        }
-
-        function getAllBookmarks() {
-            let list = [];
-            if (data && data.bookmarks) {
-                data.bookmarks.forEach(bm => {
-                    list.push({ name: bm.name || '', url: bm.url || '' });
-                });
-            }
-            if (data && data.folders) {
-                data.folders.forEach(folder => {
-                    if (folder.links) {
-                        folder.links.forEach(link => {
-                            list.push({ name: link.name || '', url: link.url || '' });
-                        });
-                    }
-                });
-            }
-            return list;
-        }
-
-        function openBookmarkUrl(url) {
-            window.location.href = url.startsWith('http') ? url : 'https://' + url;
-        }
-
-        function updateSuggestions() {
-            const query = searchInput.value.trim().toLowerCase();
-            if (!query) {
-                suggestionsContainer.style.display = 'none';
-                currentSuggestions = [];
-                selectionModeActive = false;
-                return;
-            }
-
-            const allBMs = getAllBookmarks();
-            const filtered = allBMs.filter(bm => 
-                bm.name.toLowerCase().includes(query) || 
-                bm.url.toLowerCase().includes(query)
-            );
-
-            currentSuggestions = filtered.slice(0, 9);
-
-            if (currentSuggestions.length === 0) {
-                suggestionsContainer.style.display = 'none';
-                selectionModeActive = false;
-                return;
-            }
-
-            suggestionsContainer.innerHTML = '';
-            currentSuggestions.forEach((bm, index) => {
-                const item = document.createElement('div');
-                item.className = 'suggestion-item';
-                if (selectionModeActive) {
-                    item.classList.add('selection-active');
-                }
-
-                const numSpan = document.createElement('span');
-                numSpan.className = 'suggestion-number';
-                numSpan.innerText = index + 1;
-
-                const infoDiv = document.createElement('div');
-                infoDiv.className = 'suggestion-info';
-
-                const nameSpan = document.createElement('span');
-                nameSpan.className = 'suggestion-name';
-                nameSpan.innerText = bm.name;
-
-                const urlSpan = document.createElement('span');
-                urlSpan.className = 'suggestion-url';
-                urlSpan.innerText = bm.url;
-
-                infoDiv.appendChild(nameSpan);
-                infoDiv.appendChild(urlSpan);
-                item.appendChild(numSpan);
-                item.appendChild(infoDiv);
-
-                item.addEventListener('click', () => {
-                    openBookmarkUrl(bm.url);
-                });
-
-                suggestionsContainer.appendChild(item);
-            });
-
-            suggestionsContainer.style.display = 'flex';
-        }
-
-        searchInput.addEventListener('input', () => {
-            selectionModeActive = false;
-            updateSuggestions();
-        });
-
-        searchInput.addEventListener('keydown', (e) => {
-            const suggestionsVisible = suggestionsContainer.style.display === 'flex' && currentSuggestions.length > 0;
-
-            if (suggestionsVisible) {
-                if (e.key === 'Escape') {
-                    if (requireTabForShortcuts && selectionModeActive) {
-                        selectionModeActive = false;
-                        const items = suggestionsContainer.querySelectorAll('.suggestion-item');
-                        items.forEach(item => item.classList.remove('selection-active'));
-                        e.preventDefault();
-                    } else {
-                        suggestionsContainer.style.display = 'none';
-                        currentSuggestions = [];
-                        selectionModeActive = false;
-                        e.preventDefault();
-                    }
-                    return;
-                }
-
-                if (e.key === 'Tab' && requireTabForShortcuts) {
-                    if (!selectionModeActive) {
-                        selectionModeActive = true;
-                        const items = suggestionsContainer.querySelectorAll('.suggestion-item');
-                        items.forEach(item => item.classList.add('selection-active'));
-                        e.preventDefault();
-                        return;
-                    }
-                }
-
-                if (/^[1-9]$/.test(e.key)) {
-                    const index = parseInt(e.key, 10) - 1;
-                    if (index < currentSuggestions.length) {
-                        if (!requireTabForShortcuts || selectionModeActive) {
-                            e.preventDefault();
-                            openBookmarkUrl(currentSuggestions[index].url);
-                            return;
-                        }
-                    }
-                }
-            }
-        });
-
-        renderAll();
-        document.addEventListener('keydown', (e) => {
-            if (document.activeElement.tagName !== 'INPUT' && e.key.length === 1 && !e.ctrlKey && !e.metaKey) searchInput.focus();
-        });
-    </script>
 </body>
 </html>
